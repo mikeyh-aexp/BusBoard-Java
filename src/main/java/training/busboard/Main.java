@@ -1,6 +1,8 @@
 package training.busboard;
 
+import javafx.scene.paint.Stop;
 import org.glassfish.jersey.jackson.JacksonFeature;
+import sun.misc.Cleaner;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -19,13 +21,14 @@ import java.util.Scanner;
 
 public class Main {
 
-    public static void main(String args[]) throws KeyManagementException, NoSuchAlgorithmException {
-
+    private static void setup() {
         System.setProperty("http.proxyHost", "localhost");
         System.setProperty("http.proxyPort", "9090");
         System.setProperty("https.proxyHost", "localhost");
         System.setProperty("https.proxyPort", "9090");
+    }
 
+    private static SSLContext sslContextSetup() throws NoSuchAlgorithmException, KeyManagementException {
         SSLContext sslcontext = SSLContext.getInstance("TLS");
 
         sslcontext.init(null, new TrustManager[]{new X509TrustManager() {
@@ -34,16 +37,10 @@ public class Main {
             public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
         }}, new SecureRandom());
 
-        // Set up a scanner input to allow user to input stopcode
-        Scanner userInput = new Scanner(System.in);
-        System.out.println("Please enter post code here: ");
-        String inputText = userInput.nextLine();
-        String userResponse = "https://api.postcodes.io/postcodes/" + inputText;
+        return sslcontext;
+    }
 
-        Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).sslContext(sslcontext).hostnameVerifier((s1, s2) -> true).build();
-
-        // ----------------------------
-
+    private static Stoppoint[] getStopPoints(Client client, String userResponse) {
         PostcodeWrapper postcode = client
                 .target(userResponse)
                 .request(MediaType.APPLICATION_JSON_TYPE)
@@ -54,30 +51,23 @@ public class Main {
                 .request(MediaType.APPLICATION_JSON_TYPE)
                 .get(StoppointWrapper.class);
 
-
         System.out.println("The two nearest stops to the postcode, " + postcode.result.getPostcode() + " are: \n");
 
-        for( int i = 0; i < 5; i++ ) {
-            Stoppoint stoppointInfo = stoppoint.stopPoints[i];
-            System.out.println( i + 1 + ":- " + stoppointInfo.getCommonName() + " stop going towards " + stoppointInfo.getAdditionalProperties().get(1).value);
-        }
+        return stoppoint.stopPoints;
+    }
 
-        System.out.println("\nEnter the number of the stop you want to see bus times for: ");
-        int inputNumber = userInput.nextInt();
-
+    private static List<Arrivals> getListArrivals(Client client, Stoppoint[] stopPoints, int inputNumber) {
 
         List<Arrivals> arrivals = client
-                .target("https://api.tfl.gov.uk/StopPoint/" + stoppoint.stopPoints[inputNumber - 1].getNaptanId() + "/Arrivals")
+                .target("https://api.tfl.gov.uk/StopPoint/" + stopPoints[inputNumber - 1].getNaptanId() + "/Arrivals")
                 .request(MediaType.APPLICATION_JSON_TYPE)
                 .get(new GenericType<List<Arrivals>>() {});
         // Sorts arrival times into ascending order
         Collections.sort(arrivals);
 
+        System.out.println("Bus times for " + stopPoints[inputNumber - 1].getCommonName() + "\n");
 
-        System.out.println("Bus times for " + stoppoint.stopPoints[inputNumber - 1].getCommonName() + "\n");
-
-
-//         Loops through arrivals array and prints out next 5 buses
+        //         Loops through arrivals array and prints out next 5 buses
         for( int i = 0; i < 5; i++ ) {
             try {
                 Arrivals busInfo = arrivals.get(i);
@@ -94,10 +84,36 @@ public class Main {
             }
         }
 
-
+        return arrivals;
 
     }
 
+    public static void main(String args[]) throws KeyManagementException, NoSuchAlgorithmException {
+        setup();
+        SSLContext sslContext = sslContextSetup();
 
+        // Set up a scanner input to allow user to input stopcode
+        Scanner userInput = new Scanner(System.in);
+        System.out.println("Please enter post code here: ");
+        String inputText = userInput.nextLine();
+        String userResponse = "https://api.postcodes.io/postcodes/" + inputText;
+
+        Client client = ClientBuilder.newBuilder().register(JacksonFeature.class).sslContext(sslContext).hostnameVerifier((s1, s2) -> true).build();
+
+        // ----------------------------
+
+        Stoppoint[] stopPoints = getStopPoints(client, userResponse);
+
+        for( int i = 0; i < 2; i++ ) {
+            Stoppoint stoppointInfo = stopPoints[i];
+            System.out.println( i + 1 + ":- " + stoppointInfo.getCommonName() + " stop going towards " + stoppointInfo.getAdditionalProperties().get(1).value);
+        }
+
+        System.out.println("\nEnter the number of the stop you want to see bus times for: ");
+        int inputNumber = userInput.nextInt();
+
+        getListArrivals(client, stopPoints, inputNumber);
+
+    }
 
 }
