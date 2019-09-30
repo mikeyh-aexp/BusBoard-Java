@@ -4,18 +4,18 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Arrivals implements Comparable<Arrivals> {
-    String $type;
-    String id;
+    public String $type;
+    public String id;
     private String naptanId;
-    String stationName;
-    String lineId;
-    String direction;
-    String bearing;
-    String destinationNaptanID;
-    String destinationName;
+    public String stationName;
+    public String lineId;
+    public String direction;
+    public String bearing;
+    public String destinationNaptanID;
+    public String destinationName;
     int timeToStation;
-    String currentLocation;
-    String expectedArrival;
+    public String currentLocation;
+    public String expectedArrival;
 
     public String get$type() {
         return $type;
